@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Download } from "lucide-react";
-import { LEVELS, REAL_POR_PONTO } from "@/constants/levels";
+import { LEVELS, REAL_POR_PONTO, Currency } from "@/constants/levels";
 import { formatCurrency, formatNumber, getNivelAtual } from "@/utils/calculations";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,17 +15,19 @@ import * as XLSX from 'xlsx';
 
 interface LevelsTableProps {
   pontosUsuario?: number;
+  currency: Currency;
 }
 
-export const LevelsTable = ({ pontosUsuario }: LevelsTableProps) => {
+export const LevelsTable = ({ pontosUsuario, currency }: LevelsTableProps) => {
   const nivelUsuario = pontosUsuario ? getNivelAtual(pontosUsuario) : null;
 
   const exportToExcel = () => {
+    const costPerPoint = currency.costPerPoint;
     const data = LEVELS.map((level) => {
-      const custoInicial = level.inicio * REAL_POR_PONTO;
-      const custoFinal = level.fim * REAL_POR_PONTO;
+      const custoInicial = level.inicio * costPerPoint;
+      const custoFinal = level.fim * costPerPoint;
       const pontosNecessarios = level.fim - level.inicio + 1;
-      const custoNivel = pontosNecessarios * REAL_POR_PONTO;
+      const custoNivel = pontosNecessarios * costPerPoint;
       
       let statusUsuario = "";
       let pontosFaltantes = 0;
@@ -37,17 +39,17 @@ export const LevelsTable = ({ pontosUsuario }: LevelsTableProps) => {
         if (nivelUsuario && level.nivel === nivelUsuario) {
           statusUsuario = "✓ SEU NÍVEL ATUAL";
           pontosJaTem = pontosUsuario - level.inicio;
-          reaisJaGastou = pontosJaTem * REAL_POR_PONTO;
+          reaisJaGastou = pontosJaTem * costPerPoint;
           pontosFaltantes = level.fim - pontosUsuario;
-          reaisFaltantes = pontosFaltantes * REAL_POR_PONTO;
+          reaisFaltantes = pontosFaltantes * costPerPoint;
         } else if (level.nivel < (nivelUsuario || 0)) {
           statusUsuario = "Completo";
           pontosJaTem = level.fim - level.inicio + 1;
-          reaisJaGastou = pontosJaTem * REAL_POR_PONTO;
+          reaisJaGastou = pontosJaTem * costPerPoint;
         } else if (level.nivel > (nivelUsuario || 0)) {
           statusUsuario = "Bloqueado";
           pontosFaltantes = level.inicio - (pontosUsuario || 0);
-          reaisFaltantes = pontosFaltantes * REAL_POR_PONTO;
+          reaisFaltantes = pontosFaltantes * costPerPoint;
         }
       }
       
@@ -56,15 +58,15 @@ export const LevelsTable = ({ pontosUsuario }: LevelsTableProps) => {
         "Pontos Inicial": level.inicio,
         "Pontos Final": level.fim,
         "Total de Pontos do Nível": pontosNecessarios,
-        "Custo Inicial (R$)": custoInicial.toFixed(2),
-        "Custo Final (R$)": custoFinal.toFixed(2),
-        "Custo do Nível (R$)": custoNivel.toFixed(2),
+        [`Custo Inicial (${currency.symbol})`]: custoInicial.toFixed(2),
+        [`Custo Final (${currency.symbol})`]: custoFinal.toFixed(2),
+        [`Custo do Nível (${currency.symbol})`]: custoNivel.toFixed(2),
         ...(pontosUsuario ? {
           "Status": statusUsuario,
           "Pontos que Você Tem": pontosJaTem,
-          "R$ Já Gastos": reaisJaGastou.toFixed(2),
+          [`${currency.symbol} Já Gastos`]: reaisJaGastou.toFixed(2),
           "Pontos Faltantes": pontosFaltantes,
-          "R$ Faltantes": reaisFaltantes.toFixed(2),
+          [`${currency.symbol} Faltantes`]: reaisFaltantes.toFixed(2),
         } : {}),
       };
     });
@@ -115,9 +117,9 @@ export const LevelsTable = ({ pontosUsuario }: LevelsTableProps) => {
               {pontosUsuario && (
                 <>
                   <TableHead className="text-neon-pink font-bold text-xs">Pontos que<br/>Você Tem</TableHead>
-                  <TableHead className="text-neon-pink font-bold text-xs">R$ Já<br/>Gastos</TableHead>
+              <TableHead className="text-neon-pink font-bold text-xs">{currency.symbol} Já<br/>Gastos</TableHead>
                   <TableHead className="text-neon-purple font-bold text-xs">Pontos<br/>Faltantes</TableHead>
-                  <TableHead className="text-neon-purple font-bold text-xs">R$<br/>Faltantes</TableHead>
+                  <TableHead className="text-neon-purple font-bold text-xs">{currency.symbol}<br/>Faltantes</TableHead>
                 </>
               )}
             </TableRow>
@@ -125,7 +127,8 @@ export const LevelsTable = ({ pontosUsuario }: LevelsTableProps) => {
           <TableBody>
             {LEVELS.map((level) => {
               const pontosNecessarios = level.fim - level.inicio + 1;
-              const custoNivel = pontosNecessarios * REAL_POR_PONTO;
+              const costPerPoint = currency.costPerPoint;
+              const custoNivel = pontosNecessarios * costPerPoint;
               const isAtual = nivelUsuario === level.nivel;
               const isCompleto = nivelUsuario && level.nivel < nivelUsuario;
               const isBloqueado = nivelUsuario && level.nivel > nivelUsuario;
@@ -138,15 +141,15 @@ export const LevelsTable = ({ pontosUsuario }: LevelsTableProps) => {
               if (pontosUsuario) {
                 if (isAtual) {
                   pontosJaTem = pontosUsuario - level.inicio;
-                  reaisJaGastou = pontosJaTem * REAL_POR_PONTO;
+                  reaisJaGastou = pontosJaTem * costPerPoint;
                   pontosFaltantes = level.fim - pontosUsuario;
-                  reaisFaltantes = pontosFaltantes * REAL_POR_PONTO;
+                  reaisFaltantes = pontosFaltantes * costPerPoint;
                 } else if (isCompleto) {
                   pontosJaTem = pontosNecessarios;
                   reaisJaGastou = custoNivel;
                 } else if (isBloqueado) {
                   pontosFaltantes = level.inicio - pontosUsuario;
-                  reaisFaltantes = pontosFaltantes * REAL_POR_PONTO;
+                  reaisFaltantes = pontosFaltantes * costPerPoint;
                 }
               }
               
@@ -177,7 +180,7 @@ export const LevelsTable = ({ pontosUsuario }: LevelsTableProps) => {
                     {formatNumber(pontosNecessarios)}
                   </TableCell>
                   <TableCell className="text-neon-pink font-medium">
-                    {formatCurrency(custoNivel)}
+                    {formatCurrency(custoNivel, currency)}
                   </TableCell>
                   {pontosUsuario && (
                     <>
@@ -185,13 +188,13 @@ export const LevelsTable = ({ pontosUsuario }: LevelsTableProps) => {
                         {pontosJaTem > 0 ? formatNumber(pontosJaTem) : "-"}
                       </TableCell>
                       <TableCell className={isAtual || isCompleto ? "text-neon-cyan font-medium" : "text-muted-foreground"}>
-                        {reaisJaGastou > 0 ? formatCurrency(reaisJaGastou) : "-"}
+                        {reaisJaGastou > 0 ? formatCurrency(reaisJaGastou, currency) : "-"}
                       </TableCell>
                       <TableCell className={isAtual || isBloqueado ? "text-neon-purple font-medium" : "text-muted-foreground"}>
                         {pontosFaltantes > 0 ? formatNumber(pontosFaltantes) : "-"}
                       </TableCell>
                       <TableCell className={isAtual || isBloqueado ? "text-neon-purple font-medium" : "text-muted-foreground"}>
-                        {reaisFaltantes > 0 ? formatCurrency(reaisFaltantes) : "-"}
+                        {reaisFaltantes > 0 ? formatCurrency(reaisFaltantes, currency) : "-"}
                       </TableCell>
                     </>
                   )}
