@@ -30,19 +30,19 @@ export const Calculator = () => {
   };
 
   return (
-    <div className="min-h-screen py-12 px-4">
+    <div className="min-h-screen py-8 px-4">
       <div className="container mx-auto max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          className="text-center mb-8"
         >
-          <CalcIcon className="w-16 h-16 mx-auto mb-4 text-neon-cyan animate-glow" />
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+          <CalcIcon className="w-12 h-12 mx-auto mb-3 text-neon-cyan animate-glow" />
+          <h2 className="text-3xl md:text-4xl font-bold mb-2">
             <span className="gradient-text">Calculadora de Gifter</span>
           </h2>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground">
             Digite seus pontos para ver suas estatísticas
           </p>
         </motion.div>
@@ -51,9 +51,9 @@ export const Calculator = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="card-glass rounded-3xl p-8 mb-12 max-w-2xl mx-auto"
+          className="card-glass rounded-2xl p-6 mb-8 max-w-2xl mx-auto"
         >
-          <div className="space-y-4">
+          <div className="space-y-3">
             <label className="text-sm font-medium text-foreground">
               Quantos pontos você possui?
             </label>
@@ -63,11 +63,11 @@ export const Calculator = () => {
               onChange={handleInputChange}
               onKeyPress={handleKeyPress}
               placeholder="Ex: 37918"
-              className="text-center text-2xl h-16 bg-background/50 border-neon-cyan/30 focus:border-neon-cyan transition-all"
+              className="text-center text-xl h-12 bg-background/50 border-neon-cyan/30 focus:border-neon-cyan transition-all"
             />
             <Button
               onClick={handleCalculate}
-              className="w-full h-14 text-lg font-bold bg-neon-pink hover:bg-neon-pink/90 text-white rounded-xl shadow-lg hover:shadow-neon-pink/50 transition-all duration-300 hover:scale-105"
+              className="w-full h-12 text-base font-bold bg-neon-pink hover:bg-neon-pink/90 text-white rounded-xl shadow-lg hover:shadow-neon-pink/50 transition-all duration-300 hover:scale-105"
             >
               Calcular
             </Button>
@@ -78,7 +78,7 @@ export const Calculator = () => {
           <StatsCards pontos={pontosCalculados} />
         )}
 
-        <LevelsTable highlightLevel={pontosCalculados ? undefined : undefined} />
+        <LevelsTable pontosUsuario={pontosCalculados || undefined} />
       </div>
     </div>
   );
