@@ -1,4 +1,4 @@
-import { LEVELS, REAL_POR_PONTO } from "@/constants/levels";
+import { LEVELS, REAL_POR_PONTO, Currency } from "@/constants/levels";
 
 export function getNivelAtual(pontos: number): number {
   if (pontos <= 0) return 0;
@@ -28,13 +28,15 @@ export function getPontosParaProximoNivel(pontos: number): number {
   return proximoNivel.inicio - pontos;
 }
 
-export function getReaisParaProximoNivel(pontos: number): number {
+export function getReaisParaProximoNivel(pontos: number, currency?: Currency): number {
   const pontosNecessarios = getPontosParaProximoNivel(pontos);
-  return pontosNecessarios * REAL_POR_PONTO;
+  const costPerPoint = currency?.costPerPoint || REAL_POR_PONTO;
+  return pontosNecessarios * costPerPoint;
 }
 
-export function getGastoTotal(pontos: number): number {
-  return pontos * REAL_POR_PONTO;
+export function getGastoTotal(pontos: number, currency?: Currency): number {
+  const costPerPoint = currency?.costPerPoint || REAL_POR_PONTO;
+  return pontos * costPerPoint;
 }
 
 export function getPontosParaNivel50(pontos: number): number {
@@ -44,9 +46,10 @@ export function getPontosParaNivel50(pontos: number): number {
   return Math.max(0, nivel50.inicio - pontos);
 }
 
-export function getReaisParaNivel50(pontos: number): number {
+export function getReaisParaNivel50(pontos: number, currency?: Currency): number {
   const pontosNecessarios = getPontosParaNivel50(pontos);
-  return pontosNecessarios * REAL_POR_PONTO;
+  const costPerPoint = currency?.costPerPoint || REAL_POR_PONTO;
+  return pontosNecessarios * costPerPoint;
 }
 
 export function getProgressoNivel(pontos: number): number {
@@ -61,10 +64,13 @@ export function getProgressoNivel(pontos: number): number {
   return (pontosNoNivel / totalPontosNivel) * 100;
 }
 
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
+export function formatCurrency(value: number, currency?: Currency): string {
+  const currencyCode = currency?.code || 'BRL';
+  const locale = currencyCode === 'BRL' ? 'pt-BR' : currencyCode === 'EUR' ? 'de-DE' : 'en-US';
+  
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'BRL',
+    currency: currencyCode,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);

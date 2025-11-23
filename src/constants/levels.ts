@@ -59,3 +59,18 @@ export const LEVELS: Level[] = [
 
 export const MOEDAS_POR_REAL = 700 / 36.05;
 export const REAL_POR_PONTO = 0.0515;
+
+export interface Currency {
+  code: string;
+  symbol: string;
+  name: string;
+  costPerPoint: number;
+}
+
+export const CURRENCIES: Currency[] = [
+  { code: 'BRL', symbol: 'R$', name: 'Real Brasileiro', costPerPoint: 0.0515 },
+  { code: 'USD', symbol: '$', name: 'Dólar Americano', costPerPoint: 0.01 },
+  { code: 'EUR', symbol: '€', name: 'Euro', costPerPoint: 0.0095 },
+  { code: 'GBP', symbol: '£', name: 'Libra Esterlina', costPerPoint: 0.008 },
+  { code: 'ARS', symbol: '$', name: 'Peso Argentino', costPerPoint: 10.5 },
+];

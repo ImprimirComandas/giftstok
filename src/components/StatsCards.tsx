@@ -11,17 +11,19 @@ import {
   formatNumber,
 } from "@/utils/calculations";
 import { Progress } from "@/components/ui/progress";
+import { Currency } from "@/constants/levels";
 
 interface StatsCardsProps {
   pontos: number;
+  currency: Currency;
 }
 
-export const StatsCards = ({ pontos }: StatsCardsProps) => {
+export const StatsCards = ({ pontos, currency }: StatsCardsProps) => {
   const nivelAtual = getNivelAtual(pontos);
   const pontosProximo = getPontosParaProximoNivel(pontos);
-  const reaisProximo = getReaisParaProximoNivel(pontos);
-  const gastoTotal = getGastoTotal(pontos);
-  const reais50 = getReaisParaNivel50(pontos);
+  const reaisProximo = getReaisParaProximoNivel(pontos, currency);
+  const gastoTotal = getGastoTotal(pontos, currency);
+  const reais50 = getReaisParaNivel50(pontos, currency);
   const progresso = getProgressoNivel(pontos);
 
   const cards = [
@@ -29,7 +31,7 @@ export const StatsCards = ({ pontos }: StatsCardsProps) => {
       icon: Trophy,
       title: "Nível Atual",
       value: nivelAtual.toString(),
-      subtitle: `Total: ${formatCurrency(gastoTotal)}`,
+      subtitle: `Total: ${formatCurrency(gastoTotal, currency)}`,
       detail: `${formatNumber(pontos)} pontos`,
       color: "text-neon-cyan",
       glow: "glow-cyan",
@@ -38,7 +40,7 @@ export const StatsCards = ({ pontos }: StatsCardsProps) => {
       icon: Target,
       title: "Próximo Nível",
       value: formatNumber(pontosProximo),
-      subtitle: formatCurrency(reaisProximo),
+      subtitle: formatCurrency(reaisProximo, currency),
       detail: `${progresso.toFixed(1)}% completo`,
       color: "text-neon-pink",
       glow: "glow-pink",
@@ -47,7 +49,7 @@ export const StatsCards = ({ pontos }: StatsCardsProps) => {
     {
       icon: Award,
       title: "Até Nível 50",
-      value: formatCurrency(reais50),
+      value: formatCurrency(reais50, currency),
       subtitle: nivelAtual >= 40 ? "Elite" : nivelAtual >= 25 ? "Avançado" : "Progresso",
       detail: `${50 - nivelAtual} níveis restantes`,
       color: "text-neon-purple",

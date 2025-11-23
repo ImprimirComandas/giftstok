@@ -6,10 +6,19 @@ import { Button } from "@/components/ui/button";
 import { StatsCards } from "./StatsCards";
 import { LevelsTable } from "./LevelsTable";
 import { formatNumber } from "@/utils/calculations";
+import { CURRENCIES, Currency } from "@/constants/levels";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Calculator = () => {
   const [pontos, setPontos] = useState<string>("");
   const [pontosCalculados, setPontosCalculados] = useState<number | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(CURRENCIES[0]);
 
   const handleCalculate = () => {
     const pontosNum = parseInt(pontos.replace(/\D/g, ""));
@@ -54,17 +63,46 @@ export const Calculator = () => {
           className="card-glass rounded-2xl p-6 mb-8 max-w-2xl mx-auto"
         >
           <div className="space-y-3">
-            <label className="text-sm font-medium text-foreground">
-              Quantos pontos você possui?
-            </label>
-            <Input
-              type="text"
-              value={pontos ? formatNumber(parseInt(pontos)) : ""}
-              onChange={handleInputChange}
-              onKeyPress={handleKeyPress}
-              placeholder="Ex: 37918"
-              className="text-center text-xl h-12 bg-background/50 border-neon-cyan/30 focus:border-neon-cyan transition-all"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-foreground">
+                  Quantos pontos você possui?
+                </label>
+                <Input
+                  type="text"
+                  value={pontos ? formatNumber(parseInt(pontos)) : ""}
+                  onChange={handleInputChange}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Ex: 37918"
+                  className="text-center text-xl h-12 bg-background/50 border-neon-cyan/30 focus:border-neon-cyan transition-all mt-1"
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-foreground">
+                  Selecione a moeda
+                </label>
+                <Select
+                  value={selectedCurrency.code}
+                  onValueChange={(value) => {
+                    const currency = CURRENCIES.find(c => c.code === value);
+                    if (currency) setSelectedCurrency(currency);
+                  }}
+                >
+                  <SelectTrigger className="h-12 bg-background/50 border-neon-purple/30 focus:border-neon-purple mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map((currency) => (
+                      <SelectItem key={currency.code} value={currency.code}>
+                        {currency.symbol} {currency.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
             <Button
               onClick={handleCalculate}
               className="w-full h-12 text-base font-bold bg-neon-pink hover:bg-neon-pink/90 text-white rounded-xl shadow-lg hover:shadow-neon-pink/50 transition-all duration-300 hover:scale-105"
@@ -75,10 +113,10 @@ export const Calculator = () => {
         </motion.div>
 
         {pontosCalculados !== null && (
-          <StatsCards pontos={pontosCalculados} />
+          <StatsCards pontos={pontosCalculados} currency={selectedCurrency} />
         )}
 
-        <LevelsTable pontosUsuario={pontosCalculados || undefined} />
+        <LevelsTable pontosUsuario={pontosCalculados || undefined} currency={selectedCurrency} />
       </div>
     </div>
   );
