@@ -14,10 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      calculation_history: {
+        Row: {
+          amount_calculated: number
+          created_at: string
+          currency_code: string
+          current_level: number
+          device_id: string
+          id: string
+          ip_address: string | null
+          points_needed: number
+          target_level: number
+        }
+        Insert: {
+          amount_calculated: number
+          created_at?: string
+          currency_code: string
+          current_level: number
+          device_id: string
+          id?: string
+          ip_address?: string | null
+          points_needed: number
+          target_level: number
+        }
+        Update: {
+          amount_calculated?: number
+          created_at?: string
+          currency_code?: string
+          current_level?: number
+          device_id?: string
+          id?: string
+          ip_address?: string | null
+          points_needed?: number
+          target_level?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      device_statistics: {
+        Row: {
+          currency_code: string | null
+          device_id: string | null
+          first_calculation: string | null
+          ip_address: string | null
+          last_calculation: string | null
+          total_amount: number | null
+          total_calculations: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
