@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { StatsCards } from "./StatsCards";
 import { LevelsTable } from "./LevelsTable";
 import { formatNumber, getNivelAtual } from "@/utils/calculations";
-import { CURRENCIES, Currency, LEVELS } from "@/constants/levels";
+import { CURRENCIES, Currency, LEVELS, TIKTOK_DISCOUNT_LINK } from "@/constants/levels";
 import {
   Select,
   SelectContent,
@@ -139,6 +139,14 @@ export const Calculator = () => {
               className="w-full h-12 text-base font-bold bg-neon-pink hover:bg-neon-pink/90 text-white rounded-xl shadow-lg hover:shadow-neon-pink/50 transition-all duration-300 hover:scale-105"
             >
               Calcular
+            </Button>
+            
+            <Button
+              onClick={() => window.open(TIKTOK_DISCOUNT_LINK, '_blank')}
+              variant="outline"
+              className="w-full h-12 text-base font-semibold border-2 border-neon-cyan/50 hover:border-neon-cyan hover:bg-neon-cyan/10 text-neon-cyan rounded-xl transition-all duration-300 hover:scale-105"
+            >
+              🎁 Comprar Moedas com 25% de Desconto
             </Button>
           </div>
         </motion.div>
