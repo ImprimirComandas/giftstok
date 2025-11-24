@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatsCards } from "./StatsCards";
 import { LevelsTable } from "./LevelsTable";
-import { formatNumber } from "@/utils/calculations";
-import { CURRENCIES, Currency } from "@/constants/levels";
+import { formatNumber, getNivelAtual } from "@/utils/calculations";
+import { CURRENCIES, Currency, LEVELS } from "@/constants/levels";
 import {
   Select,
   SelectContent,
@@ -14,16 +14,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { getDeviceId } from "@/utils/deviceId";
+import { toast } from "sonner";
 
 export const Calculator = () => {
   const [pontos, setPontos] = useState<string>("");
   const [pontosCalculados, setPontosCalculados] = useState<number | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(CURRENCIES[0]);
 
-  const handleCalculate = () => {
+  const handleCalculate = async () => {
     const pontosNum = parseInt(pontos.replace(/\D/g, ""));
     if (!isNaN(pontosNum) && pontosNum > 0) {
       setPontosCalculados(pontosNum);
+      
+      // Save calculation to database
+      try {
+        const deviceId = getDeviceId();
+        const currentLevel = getNivelAtual(pontosNum);
+        const targetLevel = LEVELS[LEVELS.length - 1].nivel; // Level 50
+        const currentLevelData = LEVELS.find(l => l.nivel === currentLevel);
+        const pointsNeeded = currentLevelData ? LEVELS[LEVELS.length - 1].fim - pontosNum : 0;
+        const amountCalculated = pointsNeeded * selectedCurrency.costPerPoint;
+        
+        const { error } = await supabase.functions.invoke('save-calculation', {
+          body: {
+            deviceId,
+            currentLevel,
+            targetLevel,
+            pointsNeeded,
+            currencyCode: selectedCurrency.code,
+            amountCalculated,
+          }
+        });
+        
+        if (error) {
+          console.error('Error saving calculation:', error);
+        }
+      } catch (error) {
+        console.error('Error saving calculation:', error);
+        // Don't show error to user, as this is a background operation
+      }
     }
   };
 
