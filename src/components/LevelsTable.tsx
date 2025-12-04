@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { Download } from "lucide-react";
-import { LEVELS, REAL_POR_PONTO, Currency } from "@/constants/levels";
+import { Download, Info } from "lucide-react";
+import { LEVELS, REAL_POR_PONTO, Currency, LEVEL_BENEFITS } from "@/constants/levels";
 import { formatCurrency, formatNumber, getNivelAtual } from "@/utils/calculations";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import * as XLSX from 'xlsx';
 
 interface LevelsTableProps {
@@ -28,6 +35,7 @@ export const LevelsTable = ({ pontosUsuario, currency }: LevelsTableProps) => {
       const custoFinal = level.fim * costPerPoint;
       const pontosNecessarios = level.fim - level.inicio + 1;
       const custoNivel = pontosNecessarios * costPerPoint;
+      const benefits = LEVEL_BENEFITS[level.nivel];
       
       let statusUsuario = "";
       let pontosFaltantes = 0;
@@ -55,6 +63,8 @@ export const LevelsTable = ({ pontosUsuario, currency }: LevelsTableProps) => {
       
       return {
         "Nível": level.nivel,
+        "Distintivo": benefits?.badge || "-",
+        "Benefícios": benefits?.benefits.join(", ") || "-",
         "Pontos Inicial": level.inicio,
         "Pontos Final": level.fim,
         "Total de Pontos do Nível": pontosNecessarios,
@@ -75,7 +85,6 @@ export const LevelsTable = ({ pontosUsuario, currency }: LevelsTableProps) => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Níveis TikTok");
     
-    // Auto-ajustar largura das colunas
     const maxWidth = data.reduce((w, r) => Math.max(w, ...Object.keys(r).map(k => k.length)), 10);
     ws['!cols'] = Object.keys(data[0]).map(() => ({ wch: maxWidth }));
     
@@ -110,6 +119,7 @@ export const LevelsTable = ({ pontosUsuario, currency }: LevelsTableProps) => {
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className="text-neon-cyan font-bold text-xs">Nível</TableHead>
+              <TableHead className="text-neon-cyan font-bold text-xs">Distintivo</TableHead>
               <TableHead className="text-neon-cyan font-bold text-xs">Pontos<br/>Inicial</TableHead>
               <TableHead className="text-neon-cyan font-bold text-xs">Pontos<br/>Final</TableHead>
               <TableHead className="text-neon-cyan font-bold text-xs">Pontos do<br/>Nível</TableHead>
@@ -117,7 +127,7 @@ export const LevelsTable = ({ pontosUsuario, currency }: LevelsTableProps) => {
               {pontosUsuario && (
                 <>
                   <TableHead className="text-neon-pink font-bold text-xs">Pontos que<br/>Você Tem</TableHead>
-              <TableHead className="text-neon-pink font-bold text-xs">{currency.symbol} Já<br/>Gastos</TableHead>
+                  <TableHead className="text-neon-pink font-bold text-xs">{currency.symbol} Já<br/>Gastos</TableHead>
                   <TableHead className="text-neon-purple font-bold text-xs">Pontos<br/>Faltantes</TableHead>
                   <TableHead className="text-neon-purple font-bold text-xs">{currency.symbol}<br/>Faltantes</TableHead>
                 </>
@@ -132,6 +142,7 @@ export const LevelsTable = ({ pontosUsuario, currency }: LevelsTableProps) => {
               const isAtual = nivelUsuario === level.nivel;
               const isCompleto = nivelUsuario && level.nivel < nivelUsuario;
               const isBloqueado = nivelUsuario && level.nivel > nivelUsuario;
+              const benefits = LEVEL_BENEFITS[level.nivel];
               
               let pontosFaltantes = 0;
               let reaisFaltantes = 0;
@@ -169,6 +180,32 @@ export const LevelsTable = ({ pontosUsuario, currency }: LevelsTableProps) => {
                       {level.nivel}
                       {isAtual && <span className="ml-2 text-[10px]">← VOCÊ</span>}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {benefits && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1">
+                              <Badge 
+                                className={`${benefits.badgeColor} text-white text-[10px] px-2 py-0.5 cursor-help`}
+                              >
+                                {benefits.badge}
+                              </Badge>
+                              <Info className="w-3 h-3 text-muted-foreground" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="font-bold mb-1">Benefícios do Nível {level.nivel}:</p>
+                            <ul className="list-disc list-inside text-xs">
+                              {benefits.benefits.map((benefit, i) => (
+                                <li key={i}>{benefit}</li>
+                              ))}
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatNumber(level.inicio)}

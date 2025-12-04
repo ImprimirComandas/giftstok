@@ -1,1 +1,7 @@
 project_id = "fqdriaewxownygaknqlq"
+
+[functions.save-calculation]
+verify_jwt = false
+
+[functions.save-coin-price]
+verify_jwt = false

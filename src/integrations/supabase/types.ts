@@ -50,6 +50,33 @@ export type Database = {
         }
         Relationships: []
       }
+      coin_price_history: {
+        Row: {
+          created_at: string
+          currency_code: string
+          device_id: string
+          id: string
+          ip_address: string | null
+          price_per_1000: number
+        }
+        Insert: {
+          created_at?: string
+          currency_code?: string
+          device_id: string
+          id?: string
+          ip_address?: string | null
+          price_per_1000: number
+        }
+        Update: {
+          created_at?: string
+          currency_code?: string
+          device_id?: string
+          id?: string
+          ip_address?: string | null
+          price_per_1000?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       device_statistics: {
