@@ -1,11 +1,13 @@
 import { motion } from "framer-motion";
-import { Trophy, Target, Award } from "lucide-react";
+import { Trophy, Target, Award, Sparkles } from "lucide-react";
 import {
   getNivelAtual,
   getPontosParaProximoNivel,
   getReaisParaProximoNivel,
   getGastoTotal,
-  getReaisParaNivel50,
+  getProximoMarco,
+  getReaisParaMarco,
+  getPontosParaMarco,
   getProgressoNivel,
   formatCurrency,
   formatNumber,
@@ -23,8 +25,13 @@ export const StatsCards = ({ pontos, currency }: StatsCardsProps) => {
   const pontosProximo = getPontosParaProximoNivel(pontos);
   const reaisProximo = getReaisParaProximoNivel(pontos, currency);
   const gastoTotal = getGastoTotal(pontos, currency);
-  const reais50 = getReaisParaNivel50(pontos, currency);
   const progresso = getProgressoNivel(pontos);
+  
+  // Calcula próximo marco
+  const proximoMarco = getProximoMarco(nivelAtual);
+  const reaisMarco = getReaisParaMarco(pontos, proximoMarco, currency);
+  const pontosMarco = getPontosParaMarco(pontos, proximoMarco);
+  const isLendario = nivelAtual >= 50;
 
   const cards = [
     {
@@ -39,19 +46,19 @@ export const StatsCards = ({ pontos, currency }: StatsCardsProps) => {
     {
       icon: Target,
       title: "Próximo Nível",
-      value: formatNumber(pontosProximo),
-      subtitle: formatCurrency(reaisProximo, currency),
-      detail: `${progresso.toFixed(1)}% completo`,
+      value: nivelAtual >= 50 ? "∞" : formatNumber(pontosProximo),
+      subtitle: nivelAtual >= 50 ? "Lendário" : formatCurrency(reaisProximo, currency),
+      detail: nivelAtual >= 50 ? "Nível máximo atingido!" : `${progresso.toFixed(1)}% completo`,
       color: "text-neon-pink",
       glow: "glow-pink",
-      progress: progresso,
+      progress: nivelAtual < 50 ? progresso : undefined,
     },
     {
-      icon: Award,
-      title: "Até Nível 50",
-      value: formatCurrency(reais50, currency),
-      subtitle: nivelAtual >= 40 ? "Elite" : nivelAtual >= 25 ? "Avançado" : "Progresso",
-      detail: `${50 - nivelAtual} níveis restantes`,
+      icon: isLendario ? Sparkles : Award,
+      title: isLendario ? "Nível Lendário ∞" : `Até Nível ${proximoMarco}`,
+      value: isLendario ? "∞" : formatCurrency(reaisMarco, currency),
+      subtitle: isLendario ? "Sem limites!" : `${formatNumber(pontosMarco)} pontos`,
+      detail: isLendario ? "Você é lendário!" : `${proximoMarco - nivelAtual} níveis restantes`,
       color: "text-neon-purple",
       glow: "glow-purple",
     },

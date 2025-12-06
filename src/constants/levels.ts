@@ -55,7 +55,7 @@ export const LEVELS: Level[] = [
   { nivel: 47, inicio: 56700000, fim: 67499999 },
   { nivel: 48, inicio: 67500000, fim: 74999999 },
   { nivel: 49, inicio: 75000000, fim: 97499999 },
-  { nivel: 50, inicio: 97500000, fim: 999999999999 },
+  { nivel: 50, inicio: 97500000, fim: Infinity },
 ];
 
 export const DEFAULT_PRICE_PER_1000 = 58.45;
@@ -136,5 +136,5 @@ export const LEVEL_BENEFITS: Record<number, LevelBenefit> = {
   47: { badge: "Coroa+", badgeColor: "bg-purple-400", benefits: ["Distintivo coroa brilhante"] },
   48: { badge: "Coroa Elite", badgeColor: "bg-purple-300", benefits: ["Distintivo coroa elite", "Reconhecimento top"] },
   49: { badge: "Coroa Máster", badgeColor: "bg-purple-200", benefits: ["Distintivo coroa máster", "Acesso VIP total"] },
-  50: { badge: "Lendário", badgeColor: "bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500", benefits: ["Distintivo lendário", "Todos os benefícios", "Status máximo"] },
+  50: { badge: "Lendário", badgeColor: "bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500", benefits: ["Distintivo lendário", "Todos os benefícios", "Status máximo", "Sem limites!"] },
 };

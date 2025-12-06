@@ -1,5 +1,8 @@
 import { LEVELS, REAL_POR_PONTO, Currency } from "@/constants/levels";
 
+// Marcos de níveis (milestones)
+const MARCOS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
+
 export function getNivelAtual(pontos: number): number {
   if (pontos <= 0) return 0;
   
@@ -9,8 +12,8 @@ export function getNivelAtual(pontos: number): number {
     }
   }
   
-  // Se passou do último nível
-  if (pontos > LEVELS[LEVELS.length - 1].fim) {
+  // Se passou do último nível (lendário - infinito)
+  if (pontos > LEVELS[LEVELS.length - 1].inicio) {
     return LEVELS[LEVELS.length - 1].nivel;
   }
   
@@ -39,6 +42,29 @@ export function getGastoTotal(pontos: number, currency?: Currency): number {
   return pontos * costPerPoint;
 }
 
+// Encontra o próximo marco (milestone) baseado no nível atual
+export function getProximoMarco(nivelAtual: number): number {
+  for (const marco of MARCOS) {
+    if (marco > nivelAtual) return marco;
+  }
+  return 50; // Já está no nível máximo ou além
+}
+
+// Calcula pontos necessários para atingir um marco específico
+export function getPontosParaMarco(pontos: number, marco: number): number {
+  const levelMarco = LEVELS.find(l => l.nivel === marco);
+  if (!levelMarco) return 0;
+  
+  return Math.max(0, levelMarco.inicio - pontos);
+}
+
+// Calcula custo para atingir o próximo marco
+export function getReaisParaMarco(pontos: number, marco: number, currency?: Currency): number {
+  const pontosNecessarios = getPontosParaMarco(pontos, marco);
+  const costPerPoint = currency?.costPerPoint || REAL_POR_PONTO;
+  return pontosNecessarios * costPerPoint;
+}
+
 export function getPontosParaNivel50(pontos: number): number {
   const nivel50 = LEVELS.find(l => l.nivel === 50);
   if (!nivel50) return 0;
@@ -58,8 +84,13 @@ export function getProgressoNivel(pontos: number): number {
   
   if (!levelData) return 0;
   
+  // Se for nível 50 (infinito), retorna 100%
+  if (nivelAtual === 50) return 100;
+  
   const pontosNoNivel = pontos - levelData.inicio;
   const totalPontosNivel = levelData.fim - levelData.inicio;
+  
+  if (totalPontosNivel === 0) return 100;
   
   return (pontosNoNivel / totalPontosNivel) * 100;
 }

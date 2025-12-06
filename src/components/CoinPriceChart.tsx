@@ -1,35 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Currency } from "@/constants/levels";
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Bar,
-  Cell,
-} from "recharts";
-
-interface OHLCData {
-  date: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  isUp: boolean;
-}
+import { createChart, IChartApi, Time, LineSeries } from "lightweight-charts";
 
 interface CoinPriceChartProps {
   currency: Currency;
 }
 
+interface DailyPriceData {
+  time: Time;
+  value: number;
+}
+
 export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
-  const [data, setData] = useState<OHLCData[]>([]);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const [data, setData] = useState<DailyPriceData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trend, setTrend] = useState<{ icon: typeof TrendingUp; color: string; text: string } | null>(null);
 
   useEffect(() => {
     fetchPriceData();
@@ -55,34 +45,52 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
         return;
       }
 
-      // Group by day and calculate OHLC
-      const groupedByDay: Record<string, number[]> = {};
+      // Aggregate by day - use the average of all IP submissions per day
+      const dailyData: Record<string, number[]> = {};
       
       prices.forEach((price) => {
-        const date = new Date(price.created_at).toLocaleDateString('pt-BR');
-        if (!groupedByDay[date]) {
-          groupedByDay[date] = [];
+        const date = new Date(price.created_at).toISOString().split('T')[0];
+        if (!dailyData[date]) {
+          dailyData[date] = [];
         }
-        groupedByDay[date].push(Number(price.price_per_1000));
+        dailyData[date].push(Number(price.price_per_1000));
       });
 
-      const ohlcData: OHLCData[] = Object.entries(groupedByDay).map(([date, values]) => {
-        const open = values[0];
-        const close = values[values.length - 1];
-        const high = Math.max(...values);
-        const low = Math.min(...values);
+      // Calculate cumulative average price (running mean)
+      let cumulativeSum = 0;
+      let cumulativeCount = 0;
+      
+      const chartData: DailyPriceData[] = Object.entries(dailyData)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, values]) => {
+          const dailyAverage = values.reduce((a, b) => a + b, 0) / values.length;
+          cumulativeSum += dailyAverage;
+          cumulativeCount++;
+          
+          return {
+            time: date as Time,
+            value: cumulativeSum / cumulativeCount,
+          };
+        });
+
+      setData(chartData);
+
+      // Calculate trend
+      if (chartData.length >= 2) {
+        const firstValue = chartData[0].value;
+        const lastValue = chartData[chartData.length - 1].value;
+        const diff = ((lastValue - firstValue) / firstValue) * 100;
         
-        return {
-          date,
-          open,
-          high,
-          low,
-          close,
-          isUp: close >= open,
-        };
-      });
-
-      setData(ohlcData);
+        if (diff > 0) {
+          setTrend({ icon: TrendingUp, color: "text-green-500", text: `+${diff.toFixed(2)}%` });
+        } else if (diff < 0) {
+          setTrend({ icon: TrendingDown, color: "text-red-500", text: `${diff.toFixed(2)}%` });
+        } else {
+          setTrend({ icon: Minus, color: "text-muted-foreground", text: "0%" });
+        }
+      } else {
+        setTrend(null);
+      }
     } catch (error) {
       console.error('Error:', error);
       setData([]);
@@ -91,79 +99,77 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
     }
   };
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const item = payload[0].payload as OHLCData;
-      return (
-        <div className="bg-background/95 border border-border rounded-lg p-3 shadow-lg">
-          <p className="font-bold text-foreground mb-2">{item.date}</p>
-          <div className="space-y-1 text-sm">
-            <p><span className="text-muted-foreground">Abertura:</span> {currency.symbol}{item.open.toFixed(2)}</p>
-            <p><span className="text-muted-foreground">Máxima:</span> <span className="text-green-500">{currency.symbol}{item.high.toFixed(2)}</span></p>
-            <p><span className="text-muted-foreground">Mínima:</span> <span className="text-red-500">{currency.symbol}{item.low.toFixed(2)}</span></p>
-            <p><span className="text-muted-foreground">Fechamento:</span> {currency.symbol}{item.close.toFixed(2)}</p>
-          </div>
-        </div>
-      );
+  // Initialize and update chart
+  useEffect(() => {
+    if (!chartContainerRef.current || loading || data.length === 0) return;
+
+    // Clean up previous chart
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
     }
-    return null;
-  };
 
-  // Custom OHLC candlestick shape
-  const CandlestickBar = (props: any) => {
-    const { x, y, width, height, payload } = props;
-    const { open, high, low, close, isUp } = payload;
-    
-    const color = isUp ? '#22c55e' : '#ef4444';
-    const bodyTop = Math.min(open, close);
-    const bodyBottom = Math.max(open, close);
-    
-    // Calculate positions based on price scale
-    const priceRange = props.yAxis?.domain || [low, high];
-    const chartHeight = props.background?.height || 200;
-    const yScale = chartHeight / (priceRange[1] - priceRange[0]);
-    
-    const candleX = x + width / 2;
-    const bodyY = y;
-    const bodyHeight = Math.max(height, 2);
-    
-    return (
-      <g>
-        {/* Wick line */}
-        <line
-          x1={candleX}
-          y1={bodyY - (high - Math.max(open, close)) * (bodyHeight / (Math.abs(close - open) || 1))}
-          x2={candleX}
-          y2={bodyY + bodyHeight + (Math.min(open, close) - low) * (bodyHeight / (Math.abs(close - open) || 1))}
-          stroke={color}
-          strokeWidth={1}
-        />
-        {/* Body */}
-        <rect
-          x={x + width * 0.2}
-          y={bodyY}
-          width={width * 0.6}
-          height={bodyHeight}
-          fill={isUp ? color : color}
-          stroke={color}
-          strokeWidth={1}
-        />
-      </g>
-    );
-  };
+    // Create new chart
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { color: 'transparent' },
+        textColor: '#a1a1aa',
+      },
+      grid: {
+        vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.1)' },
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 256,
+      rightPriceScale: {
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+      },
+      timeScale: {
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: {
+        vertLine: {
+          color: 'rgba(34, 211, 238, 0.5)',
+          labelBackgroundColor: '#22d3ee',
+        },
+        horzLine: {
+          color: 'rgba(34, 211, 238, 0.5)',
+          labelBackgroundColor: '#22d3ee',
+        },
+      },
+    });
 
-  const getTrend = () => {
-    if (data.length < 2) return null;
-    const lastClose = data[data.length - 1].close;
-    const firstClose = data[0].close;
-    const diff = ((lastClose - firstClose) / firstClose) * 100;
-    
-    if (diff > 0) return { icon: TrendingUp, color: "text-green-500", text: `+${diff.toFixed(2)}%` };
-    if (diff < 0) return { icon: TrendingDown, color: "text-red-500", text: `${diff.toFixed(2)}%` };
-    return { icon: Minus, color: "text-muted-foreground", text: "0%" };
-  };
+    const lineSeries = chart.addSeries(LineSeries, {
+      color: '#22d3ee',
+      lineWidth: 2,
+    });
 
-  const trend = getTrend();
+    lineSeries.setData(data);
+    chart.timeScale().fitContent();
+
+    chartRef.current = chart;
+
+    // Handle resize
+    const handleResize = () => {
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+        });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+    };
+  }, [data, loading, currency.symbol]);
 
   if (loading) {
     return (
@@ -174,7 +180,7 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
       >
         <div className="animate-pulse">
           <div className="h-6 bg-muted rounded w-1/3 mb-4"></div>
-          <div className="h-48 bg-muted rounded"></div>
+          <div className="h-64 bg-muted rounded"></div>
         </div>
       </motion.div>
     );
@@ -207,7 +213,7 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h3 className="text-xl font-bold">
-          <span className="gradient-text">Gráfico OHLC - Preço de 1000 Moedas ({currency.symbol})</span>
+          <span className="gradient-text">Preço Médio Cumulativo - 1000 Moedas ({currency.symbol})</span>
         </h3>
         {trend && (
           <div className={`flex items-center gap-2 ${trend.color}`}>
@@ -217,43 +223,12 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
         )}
       </div>
       
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-            <XAxis 
-              dataKey="date" 
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-              tickLine={{ stroke: 'hsl(var(--border))' }}
-            />
-            <YAxis 
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-              tickLine={{ stroke: 'hsl(var(--border))' }}
-              tickFormatter={(value) => `${currency.symbol}${value}`}
-              domain={['dataMin - 5', 'dataMax + 5']}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar 
-              dataKey="high" 
-              shape={<CandlestickBar />}
-              isAnimationActive={false}
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.isUp ? '#22c55e' : '#ef4444'} />
-              ))}
-            </Bar>
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
+      <div ref={chartContainerRef} className="h-64" />
 
       <div className="mt-4 flex flex-wrap gap-4 text-xs">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-500 rounded"></div>
-          <span className="text-muted-foreground">Alta (fechamento ≥ abertura)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-red-500 rounded"></div>
-          <span className="text-muted-foreground">Baixa (fechamento &lt; abertura)</span>
+          <div className="w-3 h-3 bg-cyan-400 rounded"></div>
+          <span className="text-muted-foreground">Média cumulativa de preços (1 registro por IP/dia)</span>
         </div>
       </div>
     </motion.div>
