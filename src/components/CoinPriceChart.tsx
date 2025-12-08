@@ -1,23 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Currency } from "@/constants/levels";
-import { createChart, IChartApi, Time, LineSeries } from "lightweight-charts";
+import { createChart, IChartApi, Time, CandlestickSeries } from "lightweight-charts";
 
 interface CoinPriceChartProps {
   currency: Currency;
 }
 
-interface DailyPriceData {
+interface CandleData {
   time: Time;
-  value: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
 }
 
-export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
+export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const [data, setData] = useState<DailyPriceData[]>([]);
+  const [data, setData] = useState<CandleData[]>([]);
   const [loading, setLoading] = useState(true);
   const [trend, setTrend] = useState<{ icon: typeof TrendingUp; color: string; text: string } | null>(null);
 
@@ -45,7 +48,7 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
         return;
       }
 
-      // Aggregate by day - use the average of all IP submissions per day
+      // Aggregate by day - calculate OHLC for each day
       const dailyData: Record<string, number[]> = {};
       
       prices.forEach((price) => {
@@ -56,30 +59,31 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
         dailyData[date].push(Number(price.price_per_1000));
       });
 
-      // Calculate cumulative average price (running mean)
-      let cumulativeSum = 0;
-      let cumulativeCount = 0;
-      
-      const chartData: DailyPriceData[] = Object.entries(dailyData)
+      // Create candlestick data with OHLC values
+      const chartData: CandleData[] = Object.entries(dailyData)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, values]) => {
-          const dailyAverage = values.reduce((a, b) => a + b, 0) / values.length;
-          cumulativeSum += dailyAverage;
-          cumulativeCount++;
+          const open = values[0]; // First value of the day
+          const close = values[values.length - 1]; // Last value of the day
+          const high = Math.max(...values); // Highest value
+          const low = Math.min(...values); // Lowest value
           
           return {
             time: date as Time,
-            value: cumulativeSum / cumulativeCount,
+            open,
+            high,
+            low,
+            close,
           };
         });
 
       setData(chartData);
 
-      // Calculate trend
+      // Calculate trend based on first and last close
       if (chartData.length >= 2) {
-        const firstValue = chartData[0].value;
-        const lastValue = chartData[chartData.length - 1].value;
-        const diff = ((lastValue - firstValue) / firstValue) * 100;
+        const firstClose = chartData[0].close;
+        const lastClose = chartData[chartData.length - 1].close;
+        const diff = ((lastClose - firstClose) / firstClose) * 100;
         
         if (diff > 0) {
           setTrend({ icon: TrendingUp, color: "text-green-500", text: `+${diff.toFixed(2)}%` });
@@ -88,6 +92,8 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
         } else {
           setTrend({ icon: Minus, color: "text-muted-foreground", text: "0%" });
         }
+      } else if (chartData.length === 1) {
+        setTrend({ icon: Minus, color: "text-muted-foreground", text: `${currency.symbol}${chartData[0].close.toFixed(2)}` });
       } else {
         setTrend(null);
       }
@@ -141,12 +147,16 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
       },
     });
 
-    const lineSeries = chart.addSeries(LineSeries, {
-      color: '#22d3ee',
-      lineWidth: 2,
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
+      upColor: '#22c55e',
+      downColor: '#ef4444',
+      borderUpColor: '#22c55e',
+      borderDownColor: '#ef4444',
+      wickUpColor: '#22c55e',
+      wickDownColor: '#ef4444',
     });
 
-    lineSeries.setData(data);
+    candlestickSeries.setData(data);
     chart.timeScale().fitContent();
 
     chartRef.current = chart;
@@ -169,7 +179,7 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
         chartRef.current = null;
       }
     };
-  }, [data, loading, currency.symbol]);
+  }, [data, loading]);
 
   if (loading) {
     return (
@@ -213,7 +223,7 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h3 className="text-xl font-bold">
-          <span className="gradient-text">Preço Médio Cumulativo - 1000 Moedas ({currency.symbol})</span>
+          <span className="gradient-text">Preço de 1000 Moedas ({currency.symbol})</span>
         </h3>
         {trend && (
           <div className={`flex items-center gap-2 ${trend.color}`}>
@@ -227,10 +237,16 @@ export const CoinPriceChart = ({ currency }: CoinPriceChartProps) => {
 
       <div className="mt-4 flex flex-wrap gap-4 text-xs">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-cyan-400 rounded"></div>
-          <span className="text-muted-foreground">Média cumulativa de preços (1 registro por IP/dia)</span>
+          <div className="w-3 h-3 bg-green-500 rounded"></div>
+          <span className="text-muted-foreground">Alta (fechou acima da abertura)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-red-500 rounded"></div>
+          <span className="text-muted-foreground">Baixa (fechou abaixo da abertura)</span>
         </div>
       </div>
     </motion.div>
   );
-};
+});
+
+CoinPriceChart.displayName = 'CoinPriceChart';
