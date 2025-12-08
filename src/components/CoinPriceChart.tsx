@@ -23,6 +23,12 @@ export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
   const [data, setData] = useState<CandleData[]>([]);
   const [loading, setLoading] = useState(true);
   const [trend, setTrend] = useState<{ icon: typeof TrendingUp; color: string; text: string } | null>(null);
+  const [tooltipData, setTooltipData] = useState<{ visible: boolean; x: number; y: number; data: CandleData | null }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    data: null,
+  });
 
   useEffect(() => {
     fetchPriceData();
@@ -60,22 +66,28 @@ export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
       });
 
       // Create candlestick data with OHLC values
-      const chartData: CandleData[] = Object.entries(dailyData)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, values]) => {
-          const open = values[0]; // First value of the day
-          const close = values[values.length - 1]; // Last value of the day
-          const high = Math.max(...values); // Highest value
-          const low = Math.min(...values); // Lowest value
-          
-          return {
-            time: date as Time,
-            open,
-            high,
-            low,
-            close,
-          };
-        });
+      // Open = previous day's close (or first value if no previous day)
+      const sortedDates = Object.keys(dailyData).sort((a, b) => a.localeCompare(b));
+      let previousClose: number | null = null;
+      
+      const chartData: CandleData[] = sortedDates.map((date) => {
+        const values = dailyData[date];
+        const high = Math.max(...values);
+        const low = Math.min(...values);
+        const close = values[values.length - 1]; // Last value of the day
+        // Open = previous day's close, or first value if no previous day
+        const open = previousClose !== null ? previousClose : values[0];
+        
+        previousClose = close; // Store for next day
+        
+        return {
+          time: date as Time,
+          open,
+          high,
+          low,
+          close,
+        };
+      });
 
       setData(chartData);
 
@@ -159,6 +171,25 @@ export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
     candlestickSeries.setData(data);
     chart.timeScale().fitContent();
 
+    // Subscribe to crosshair move for tooltip
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time || !param.point || !chartContainerRef.current) {
+        setTooltipData(prev => ({ ...prev, visible: false }));
+        return;
+      }
+
+      const candleData = param.seriesData.get(candlestickSeries) as CandleData | undefined;
+      if (candleData) {
+        const containerRect = chartContainerRef.current.getBoundingClientRect();
+        setTooltipData({
+          visible: true,
+          x: param.point.x,
+          y: param.point.y,
+          data: candleData,
+        });
+      }
+    });
+
     chartRef.current = chart;
 
     // Handle resize
@@ -233,7 +264,32 @@ export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
         )}
       </div>
       
-      <div ref={chartContainerRef} className="h-64" />
+      <div ref={chartContainerRef} className="h-64 relative">
+        {/* Tooltip */}
+        {tooltipData.visible && tooltipData.data && (
+          <div
+            className="absolute z-10 bg-background/95 border border-border rounded-lg p-3 shadow-lg pointer-events-none"
+            style={{
+              left: tooltipData.x > 200 ? tooltipData.x - 140 : tooltipData.x + 10,
+              top: tooltipData.y > 150 ? tooltipData.y - 100 : tooltipData.y + 10,
+            }}
+          >
+            <div className="text-xs text-muted-foreground mb-2">{tooltipData.data.time as string}</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <span className="text-muted-foreground">Abertura:</span>
+              <span className="font-medium">{currency.symbol}{tooltipData.data.open.toFixed(2)}</span>
+              <span className="text-muted-foreground">Máxima:</span>
+              <span className="font-medium text-green-500">{currency.symbol}{tooltipData.data.high.toFixed(2)}</span>
+              <span className="text-muted-foreground">Mínima:</span>
+              <span className="font-medium text-red-500">{currency.symbol}{tooltipData.data.low.toFixed(2)}</span>
+              <span className="text-muted-foreground">Fechamento:</span>
+              <span className={`font-medium ${tooltipData.data.close >= tooltipData.data.open ? 'text-green-500' : 'text-red-500'}`}>
+                {currency.symbol}{tooltipData.data.close.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="mt-4 flex flex-wrap gap-4 text-xs">
         <div className="flex items-center gap-2">
