@@ -253,9 +253,14 @@ export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
       className="card-glass rounded-2xl p-6"
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <h3 className="text-xl font-bold">
-          <span className="gradient-text">Preço de 1000 Moedas ({currency.symbol})</span>
-        </h3>
+        <div>
+          <h3 className="text-xl font-bold">
+            <span className="gradient-text">Preço de 1000 Moedas ({currency.symbol})</span>
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            📅 Atualização diária às 14h por um administrador
+          </p>
+        </div>
         {trend && (
           <div className={`flex items-center gap-2 ${trend.color}`}>
             <trend.icon className="w-5 h-5" />
