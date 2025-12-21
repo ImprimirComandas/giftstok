@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Coins, LogOut, Send, Users, History, ChevronDown, ChevronUp } from "lucide-react";
+import { Coins, LogOut, Send, Users, History, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { getDeviceId } from "@/utils/deviceId";
 import {
   Table,
@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CURRENCIES, Currency } from "@/constants/levels";
+import * as XLSX from "xlsx";
 
 interface VisitorData {
   ip_address: string;
@@ -211,6 +212,66 @@ const Admin = () => {
     });
   };
 
+  const exportToExcel = async () => {
+    // Fetch all calculation history for export
+    const { data: allHistory, error } = await supabase
+      .from('calculation_history')
+      .select('*')
+      .eq('currency_code', selectedCurrency.code)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar dados para exportação.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prepare data for Excel
+    const exportData = allHistory?.map(calc => ({
+      'IP': calc.ip_address || 'N/A',
+      'Device ID': calc.device_id,
+      'Nível Atual': calc.current_level,
+      'Nível Alvo': calc.target_level,
+      'Pontos Necessários': calc.points_needed,
+      'Valor Calculado': Number(calc.amount_calculated),
+      'Moeda': calc.currency_code,
+      'Data/Hora': new Date(calc.created_at).toLocaleString('pt-BR'),
+    })) || [];
+
+    // Create workbook and worksheet
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Visitantes');
+
+    // Auto-size columns
+    const colWidths = [
+      { wch: 15 }, // IP
+      { wch: 40 }, // Device ID
+      { wch: 12 }, // Nível Atual
+      { wch: 12 }, // Nível Alvo
+      { wch: 18 }, // Pontos
+      { wch: 15 }, // Valor
+      { wch: 8 },  // Moeda
+      { wch: 20 }, // Data
+    ];
+    ws['!cols'] = colWidths;
+
+    // Generate file name with date
+    const dateStr = new Date().toISOString().split('T')[0];
+    const fileName = `visitantes_${selectedCurrency.code}_${dateStr}.xlsx`;
+
+    // Download
+    XLSX.writeFile(wb, fileName);
+
+    toast({
+      title: "Exportado!",
+      description: `Arquivo ${fileName} baixado com sucesso.`,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <motion.div
@@ -303,10 +364,19 @@ const Admin = () => {
 
         {/* Visitors Section */}
         <div className="card-glass rounded-2xl p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Visitantes do Sistema ({visitors.length})
-          </h2>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
+              Visitantes do Sistema ({visitors.length})
+            </h2>
+            
+            {visitors.length > 0 && (
+              <Button variant="outline" size="sm" onClick={exportToExcel}>
+                <Download className="w-4 h-4 mr-2" />
+                Exportar Excel
+              </Button>
+            )}
+          </div>
 
           {visitors.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
