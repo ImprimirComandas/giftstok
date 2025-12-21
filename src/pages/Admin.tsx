@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Coins, LogOut, Send, Users, History, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { Coins, LogOut, Send, Users, History, ChevronDown, ChevronUp, Download, Search, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { getDeviceId } from "@/utils/deviceId";
 import {
   Table,
@@ -46,6 +46,10 @@ interface CalculationHistory {
   currency_code: string;
 }
 
+type PeriodFilter = 'all' | '7d' | '30d' | 'today';
+
+const ITEMS_PER_PAGE = 10;
+
 const Admin = () => {
   const [price, setPrice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,6 +58,9 @@ const Admin = () => {
   const [visitorHistory, setVisitorHistory] = useState<Record<string, CalculationHistory[]>>({});
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(CURRENCIES[0]);
   const [todayPrice, setTodayPrice] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -201,6 +208,51 @@ const Admin = () => {
       }
     }
   };
+
+  // Filter visitors based on search and period
+  const filteredVisitors = useMemo(() => {
+    let filtered = visitors;
+
+    // Filter by IP search
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(v => 
+        v.ip_address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        v.device_id?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Filter by period
+    if (periodFilter !== 'all') {
+      const now = new Date();
+      let cutoffDate: Date;
+      
+      if (periodFilter === 'today') {
+        cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      } else if (periodFilter === '7d') {
+        cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else {
+        cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+
+      filtered = filtered.filter(v => 
+        v.last_calculation && new Date(v.last_calculation) >= cutoffDate
+      );
+    }
+
+    return filtered;
+  }, [visitors, searchQuery, periodFilter]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredVisitors.length / ITEMS_PER_PAGE);
+  const paginatedVisitors = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredVisitors.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredVisitors, currentPage]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, periodFilter]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('pt-BR', {
@@ -367,7 +419,7 @@ const Admin = () => {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Users className="w-5 h-5 text-primary" />
-              Visitantes do Sistema ({visitors.length})
+              Visitantes do Sistema ({filteredVisitors.length})
             </h2>
             
             {visitors.length > 0 && (
@@ -378,100 +430,203 @@ const Admin = () => {
             )}
           </div>
 
-          {visitors.length === 0 ? (
+          {/* Filters */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por IP ou Device ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+              <Button
+                variant={periodFilter === 'today' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setPeriodFilter('today')}
+                className="text-xs h-8 px-3"
+              >
+                <Calendar className="w-3 h-3 mr-1" />
+                Hoje
+              </Button>
+              <Button
+                variant={periodFilter === '7d' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setPeriodFilter('7d')}
+                className="text-xs h-8 px-3"
+              >
+                7 dias
+              </Button>
+              <Button
+                variant={periodFilter === '30d' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setPeriodFilter('30d')}
+                className="text-xs h-8 px-3"
+              >
+                30 dias
+              </Button>
+              <Button
+                variant={periodFilter === 'all' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setPeriodFilter('all')}
+                className="text-xs h-8 px-3"
+              >
+                Todos
+              </Button>
+            </div>
+          </div>
+
+          {filteredVisitors.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>Nenhum visitante registrado ainda.</p>
+              <p>{searchQuery || periodFilter !== 'all' ? 'Nenhum visitante encontrado com os filtros aplicados.' : 'Nenhum visitante registrado ainda.'}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8"></TableHead>
-                    <TableHead>IP</TableHead>
-                    <TableHead>Cálculos</TableHead>
-                    <TableHead>Total Buscado</TableHead>
-                    <TableHead>Primeira Ação</TableHead>
-                    <TableHead>Última Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visitors.map((visitor) => (
-                    <>
-                      <TableRow 
-                        key={visitor.ip_address}
-                        className="cursor-pointer hover:bg-accent/50 transition-colors"
-                        onClick={() => toggleVisitorHistory(visitor.ip_address, visitor.device_id)}
-                      >
-                        <TableCell>
-                          {expandedVisitor === visitor.ip_address ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {visitor.ip_address || 'N/A'}
-                        </TableCell>
-                        <TableCell>{visitor.total_calculations}</TableCell>
-                        <TableCell className="font-medium">
-                          {selectedCurrency.symbol}{Number(visitor.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {visitor.first_calculation ? formatDate(visitor.first_calculation) : 'N/A'}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {visitor.last_calculation ? formatDate(visitor.last_calculation) : 'N/A'}
-                        </TableCell>
-                      </TableRow>
-                      
-                      {/* Expanded History */}
-                      {expandedVisitor === visitor.ip_address && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="bg-accent/20 p-0">
-                            <div className="p-4">
-                              <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
-                                <History className="w-4 h-4" />
-                                Histórico de Níveis Buscados
-                              </div>
-                              
-                              {visitorHistory[visitor.ip_address] ? (
-                                visitorHistory[visitor.ip_address].length > 0 ? (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                    {visitorHistory[visitor.ip_address].map((calc) => (
-                                      <div 
-                                        key={calc.id}
-                                        className="bg-background/50 rounded-lg p-3 text-sm"
-                                      >
-                                        <div className="flex justify-between items-center mb-1">
-                                          <span className="font-medium">
-                                            Nível {calc.current_level} → {calc.target_level}
-                                          </span>
-                                          <span className="text-primary font-bold">
-                                            {selectedCurrency.symbol}{Number(calc.amount_calculated).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                          </span>
-                                        </div>
-                                        <div className="text-muted-foreground text-xs">
-                                          {Number(calc.points_needed).toLocaleString('pt-BR')} pontos • {formatDate(calc.created_at)}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-muted-foreground text-sm">Nenhum histórico encontrado.</p>
-                                )
-                              ) : (
-                                <p className="text-muted-foreground text-sm">Carregando...</p>
-                              )}
-                            </div>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>IP</TableHead>
+                      <TableHead>Cálculos</TableHead>
+                      <TableHead>Total Buscado</TableHead>
+                      <TableHead>Primeira Ação</TableHead>
+                      <TableHead>Última Ação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedVisitors.map((visitor) => (
+                      <>
+                        <TableRow 
+                          key={visitor.ip_address}
+                          className="cursor-pointer hover:bg-accent/50 transition-colors"
+                          onClick={() => toggleVisitorHistory(visitor.ip_address, visitor.device_id)}
+                        >
+                          <TableCell>
+                            {expandedVisitor === visitor.ip_address ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {visitor.ip_address || 'N/A'}
+                          </TableCell>
+                          <TableCell>{visitor.total_calculations}</TableCell>
+                          <TableCell className="font-medium">
+                            {selectedCurrency.symbol}{Number(visitor.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {visitor.first_calculation ? formatDate(visitor.first_calculation) : 'N/A'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {visitor.last_calculation ? formatDate(visitor.last_calculation) : 'N/A'}
                           </TableCell>
                         </TableRow>
-                      )}
-                    </>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                        
+                        {/* Expanded History */}
+                        {expandedVisitor === visitor.ip_address && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="bg-accent/20 p-0">
+                              <div className="p-4">
+                                <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
+                                  <History className="w-4 h-4" />
+                                  Histórico de Níveis Buscados
+                                </div>
+                                
+                                {visitorHistory[visitor.ip_address] ? (
+                                  visitorHistory[visitor.ip_address].length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                      {visitorHistory[visitor.ip_address].map((calc) => (
+                                        <div 
+                                          key={calc.id}
+                                          className="bg-background/50 rounded-lg p-3 text-sm"
+                                        >
+                                          <div className="flex justify-between items-center mb-1">
+                                            <span className="font-medium">
+                                              Nível {calc.current_level} → {calc.target_level}
+                                            </span>
+                                            <span className="text-primary font-bold">
+                                              {selectedCurrency.symbol}{Number(calc.amount_calculated).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </span>
+                                          </div>
+                                          <div className="text-muted-foreground text-xs">
+                                            {Number(calc.points_needed).toLocaleString('pt-BR')} pontos • {formatDate(calc.created_at)}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-muted-foreground text-sm">Nenhum histórico encontrado.</p>
+                                  )
+                                ) : (
+                                  <p className="text-muted-foreground text-sm">Carregando...</p>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+                  <p className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages} ({filteredVisitors.length} visitantes)
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <div className="flex gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum: number;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </motion.div>
