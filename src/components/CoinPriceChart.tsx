@@ -4,6 +4,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Currency } from "@/constants/levels";
 import { createChart, IChartApi, Time, CandlestickSeries } from "lightweight-charts";
+import { Button } from "@/components/ui/button";
 
 interface CoinPriceChartProps {
   currency: Currency;
@@ -17,11 +18,14 @@ interface CandleData {
   close: number;
 }
 
+type PeriodFilter = '7d' | '30d' | 'all';
+
 export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [data, setData] = useState<CandleData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [trend, setTrend] = useState<{ icon: typeof TrendingUp; color: string; text: string } | null>(null);
   const [tooltipData, setTooltipData] = useState<{ visible: boolean; x: number; y: number; data: CandleData | null }>({
     visible: false,
@@ -32,16 +36,34 @@ export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
 
   useEffect(() => {
     fetchPriceData();
-  }, [currency.code]);
+  }, [currency.code, periodFilter]);
 
   const fetchPriceData = async () => {
     setLoading(true);
     try {
-      const { data: prices, error } = await supabase
+      // Calculate date filter based on period
+      let dateFilter: string | null = null;
+      if (periodFilter === '7d') {
+        const date = new Date();
+        date.setDate(date.getDate() - 7);
+        dateFilter = date.toISOString();
+      } else if (periodFilter === '30d') {
+        const date = new Date();
+        date.setDate(date.getDate() - 30);
+        dateFilter = date.toISOString();
+      }
+
+      let query = supabase
         .from('coin_price_history')
         .select('*')
         .eq('currency_code', currency.code)
         .order('created_at', { ascending: true });
+
+      if (dateFilter) {
+        query = query.gte('created_at', dateFilter);
+      }
+
+      const { data: prices, error } = await query;
 
       if (error) {
         console.error('Error fetching prices:', error);
@@ -261,12 +283,40 @@ export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
             📅 Atualização diária às 14h por um administrador
           </p>
         </div>
-        {trend && (
-          <div className={`flex items-center gap-2 ${trend.color}`}>
-            <trend.icon className="w-5 h-5" />
-            <span className="font-bold">{trend.text}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+            <Button
+              variant={periodFilter === '7d' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setPeriodFilter('7d')}
+              className="text-xs h-7 px-3"
+            >
+              7 dias
+            </Button>
+            <Button
+              variant={periodFilter === '30d' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setPeriodFilter('30d')}
+              className="text-xs h-7 px-3"
+            >
+              30 dias
+            </Button>
+            <Button
+              variant={periodFilter === 'all' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setPeriodFilter('all')}
+              className="text-xs h-7 px-3"
+            >
+              Todos
+            </Button>
           </div>
-        )}
+          {trend && (
+            <div className={`flex items-center gap-2 ${trend.color}`}>
+              <trend.icon className="w-5 h-5" />
+              <span className="font-bold">{trend.text}</span>
+            </div>
+          )}
+        </div>
       </div>
       
       <div ref={chartContainerRef} className="h-64 relative">
