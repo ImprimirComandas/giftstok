@@ -154,6 +154,7 @@ export const Calculator = () => {
             pointsNeeded,
             currencyCode: selectedCurrency.code,
             amountCalculated,
+            userPoints: pontosNum,
           }
         });
         

@@ -25,6 +25,7 @@ export type Database = {
           ip_address: string | null
           points_needed: number
           target_level: number
+          user_points: number | null
         }
         Insert: {
           amount_calculated: number
@@ -36,6 +37,7 @@ export type Database = {
           ip_address?: string | null
           points_needed: number
           target_level: number
+          user_points?: number | null
         }
         Update: {
           amount_calculated?: number
@@ -47,6 +49,7 @@ export type Database = {
           ip_address?: string | null
           points_needed?: number
           target_level?: number
+          user_points?: number | null
         }
         Relationships: []
       }
