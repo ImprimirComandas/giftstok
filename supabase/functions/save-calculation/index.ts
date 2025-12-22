@@ -28,7 +28,8 @@ serve(async (req) => {
       targetLevel, 
       pointsNeeded, 
       currencyCode, 
-      amountCalculated 
+      amountCalculated,
+      userPoints 
     } = await req.json();
 
     console.log('Saving calculation:', { 
@@ -38,6 +39,7 @@ serve(async (req) => {
       pointsNeeded, 
       currencyCode, 
       amountCalculated,
+      userPoints,
       ipAddress: clientIp 
     });
 
@@ -52,6 +54,7 @@ serve(async (req) => {
         points_needed: pointsNeeded,
         currency_code: currencyCode,
         amount_calculated: amountCalculated,
+        user_points: userPoints,
       })
       .select()
       .single();

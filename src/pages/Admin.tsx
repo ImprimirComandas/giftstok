@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Coins, LogOut, Send, Users, History, ChevronDown, ChevronUp, Download, Search, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { toast as sonnerToast } from "sonner";
+import { Coins, LogOut, Send, Users, History, ChevronDown, ChevronUp, Download, Search, ChevronLeft, ChevronRight, Calendar, Bell } from "lucide-react";
 import { getDeviceId } from "@/utils/deviceId";
 import {
   Table,
@@ -44,6 +45,7 @@ interface CalculationHistory {
   amount_calculated: number;
   created_at: string;
   currency_code: string;
+  user_points: number | null;
 }
 
 type PeriodFilter = 'all' | '7d' | '30d' | 'today';
@@ -64,11 +66,51 @@ const Admin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const fetchVisitorsCallback = useCallback(() => {
+    fetchVisitors();
+  }, [selectedCurrency.code]);
+
   useEffect(() => {
     checkAuth();
     fetchVisitors();
     fetchTodayPrice();
   }, [selectedCurrency]);
+
+  // Real-time notifications for new calculations
+  useEffect(() => {
+    const channel = supabase
+      .channel('new-calculations')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'calculation_history'
+        },
+        (payload) => {
+          const newCalc = payload.new as any;
+          
+          // Only notify for the selected currency
+          if (newCalc.currency_code === selectedCurrency.code) {
+            sonnerToast.info(
+              `🔔 Novo cálculo!`, 
+              {
+                description: `Nível ${newCalc.current_level} → ${newCalc.target_level} • ${selectedCurrency.symbol}${Number(newCalc.amount_calculated).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                duration: 5000,
+              }
+            );
+            
+            // Refresh visitors list
+            fetchVisitorsCallback();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedCurrency.code, fetchVisitorsCallback]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -554,7 +596,7 @@ const Admin = () => {
                                             </span>
                                           </div>
                                           <div className="text-muted-foreground text-xs">
-                                            {Number(calc.points_needed).toLocaleString('pt-BR')} pontos • {formatDate(calc.created_at)}
+                                            {calc.user_points ? `${Number(calc.user_points).toLocaleString('pt-BR')} pontos atuais` : `${Number(calc.points_needed).toLocaleString('pt-BR')} pontos necessários`} • {formatDate(calc.created_at)}
                                           </div>
                                         </div>
                                       ))}
