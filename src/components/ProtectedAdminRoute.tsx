@@ -53,7 +53,7 @@ export const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/adm/auth-admin" replace />;
   }
 
   return <>{children}</>;

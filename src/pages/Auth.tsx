@@ -27,7 +27,7 @@ const Auth = () => {
           });
           
           if (isAdmin) {
-            navigate('/admin');
+            navigate('/adm');
           } else {
             toast({
               title: "Acesso negado",
@@ -49,7 +49,7 @@ const Auth = () => {
         });
         
         if (isAdmin) {
-          navigate('/admin');
+          navigate('/adm');
         }
       }
     });
@@ -67,7 +67,7 @@ const Auth = () => {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth`
+            emailRedirectTo: `${window.location.origin}/adm/auth-admin`
           }
         });
 
