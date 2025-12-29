@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
-import { Coins, LogOut, Send, Users, History, ChevronDown, ChevronUp, Download, Search, ChevronLeft, ChevronRight, Calendar, Bell } from "lucide-react";
+import { Coins, LogOut, Send, Users, Download, Search, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { getDeviceId } from "@/utils/deviceId";
 import {
   Table,
@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CURRENCIES, Currency } from "@/constants/levels";
+import { VisitorStatsModal } from "@/components/VisitorStatsModal";
 import * as XLSX from "xlsx";
 
 interface VisitorData {
@@ -56,13 +57,14 @@ const Admin = () => {
   const [price, setPrice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [visitors, setVisitors] = useState<VisitorData[]>([]);
-  const [expandedVisitor, setExpandedVisitor] = useState<string | null>(null);
-  const [visitorHistory, setVisitorHistory] = useState<Record<string, CalculationHistory[]>>({});
+  const [visitorHistory, setVisitorHistory] = useState<CalculationHistory[]>([]);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(CURRENCIES[0]);
   const [todayPrice, setTodayPrice] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -116,7 +118,7 @@ const Admin = () => {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session?.user) {
-      navigate('/auth');
+      navigate('/adm/auth-admin');
       return;
     }
 
@@ -126,7 +128,7 @@ const Admin = () => {
     });
 
     if (!isAdmin) {
-      navigate('/auth');
+      navigate('/adm/auth-admin');
     }
   };
 
@@ -165,24 +167,28 @@ const Admin = () => {
     setVisitors(data || []);
   };
 
-  const fetchVisitorHistory = async (ip: string, deviceId: string) => {
+  const fetchVisitorHistory = async (deviceId: string) => {
+    setModalLoading(true);
     const { data, error } = await supabase
       .from('calculation_history')
       .select('*')
       .eq('device_id', deviceId)
       .eq('currency_code', selectedCurrency.code)
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(20);
 
     if (error) {
       console.error('Error fetching history:', error);
-      return;
+      setVisitorHistory([]);
+    } else {
+      setVisitorHistory(data || []);
     }
+    setModalLoading(false);
+  };
 
-    setVisitorHistory(prev => ({
-      ...prev,
-      [ip]: data || []
-    }));
+  const openStatsModal = (deviceId: string) => {
+    setModalOpen(true);
+    fetchVisitorHistory(deviceId);
   };
 
   const handlePriceSubmit = async () => {
@@ -237,19 +243,9 @@ const Admin = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate('/auth');
+    navigate('/adm/auth-admin');
   };
 
-  const toggleVisitorHistory = (ip: string, deviceId: string) => {
-    if (expandedVisitor === ip) {
-      setExpandedVisitor(null);
-    } else {
-      setExpandedVisitor(ip);
-      if (!visitorHistory[ip]) {
-        fetchVisitorHistory(ip, deviceId);
-      }
-    }
-  };
 
   // Filter visitors based on search and period
   const filteredVisitors = useMemo(() => {
@@ -531,7 +527,6 @@ const Admin = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-8"></TableHead>
                       <TableHead>IP</TableHead>
                       <TableHead>Cálculos</TableHead>
                       <TableHead>Total Buscado</TableHead>
@@ -541,77 +536,27 @@ const Admin = () => {
                   </TableHeader>
                   <TableBody>
                     {paginatedVisitors.map((visitor) => (
-                      <>
-                        <TableRow 
-                          key={visitor.ip_address}
-                          className="cursor-pointer hover:bg-accent/50 transition-colors"
-                          onClick={() => toggleVisitorHistory(visitor.ip_address, visitor.device_id)}
+                      <TableRow 
+                        key={visitor.ip_address}
+                        className="hover:bg-accent/50 transition-colors"
+                      >
+                        <TableCell className="font-mono text-sm">
+                          {visitor.ip_address || 'N/A'}
+                        </TableCell>
+                        <TableCell>{visitor.total_calculations}</TableCell>
+                        <TableCell 
+                          className="font-medium text-primary cursor-pointer hover:underline"
+                          onClick={() => openStatsModal(visitor.device_id)}
                         >
-                          <TableCell>
-                            {expandedVisitor === visitor.ip_address ? (
-                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            )}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {visitor.ip_address || 'N/A'}
-                          </TableCell>
-                          <TableCell>{visitor.total_calculations}</TableCell>
-                          <TableCell className="font-medium">
-                            {selectedCurrency.symbol}{Number(visitor.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {visitor.first_calculation ? formatDate(visitor.first_calculation) : 'N/A'}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {visitor.last_calculation ? formatDate(visitor.last_calculation) : 'N/A'}
-                          </TableCell>
-                        </TableRow>
-                        
-                        {/* Expanded History */}
-                        {expandedVisitor === visitor.ip_address && (
-                          <TableRow>
-                            <TableCell colSpan={6} className="bg-accent/20 p-0">
-                              <div className="p-4">
-                                <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
-                                  <History className="w-4 h-4" />
-                                  Histórico de Níveis Buscados
-                                </div>
-                                
-                                {visitorHistory[visitor.ip_address] ? (
-                                  visitorHistory[visitor.ip_address].length > 0 ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                      {visitorHistory[visitor.ip_address].map((calc) => (
-                                        <div 
-                                          key={calc.id}
-                                          className="bg-background/50 rounded-lg p-3 text-sm"
-                                        >
-                                          <div className="flex justify-between items-center mb-1">
-                                            <span className="font-medium">
-                                              Nível {calc.current_level} → {calc.target_level}
-                                            </span>
-                                            <span className="text-primary font-bold">
-                                              {selectedCurrency.symbol}{Number(calc.amount_calculated).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            </span>
-                                          </div>
-                                          <div className="text-muted-foreground text-xs">
-                                            {calc.user_points ? `${Number(calc.user_points).toLocaleString('pt-BR')} pontos atuais` : `${Number(calc.points_needed).toLocaleString('pt-BR')} pontos necessários`} • {formatDate(calc.created_at)}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-muted-foreground text-sm">Nenhum histórico encontrado.</p>
-                                  )
-                                ) : (
-                                  <p className="text-muted-foreground text-sm">Carregando...</p>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </>
+                          {selectedCurrency.symbol}{Number(visitor.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {visitor.first_calculation ? formatDate(visitor.first_calculation) : 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {visitor.last_calculation ? formatDate(visitor.last_calculation) : 'N/A'}
+                        </TableCell>
+                      </TableRow>
                     ))}
                   </TableBody>
                 </Table>
@@ -671,6 +616,15 @@ const Admin = () => {
             </>
           )}
         </div>
+
+        {/* Stats Modal */}
+        <VisitorStatsModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          history={visitorHistory}
+          selectedCurrency={selectedCurrency}
+          isLoading={modalLoading}
+        />
       </motion.div>
     </div>
   );
