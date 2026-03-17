@@ -76,7 +76,6 @@ export const CoinPriceChart = memo(({ currency }: CoinPriceChartProps) => {
         vertLine: { color: 'rgba(34,211,238,0.4)', labelBackgroundColor: '#22d3ee' },
         horzLine: { color: 'rgba(34,211,238,0.4)', labelBackgroundColor: '#22d3ee' },
       },
-      handleTouch: true,
       handleScroll: { vertTouchDrag: false },
     });
 
