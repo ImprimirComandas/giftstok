@@ -1,22 +1,9 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Download, Info } from "lucide-react";
-import { LEVELS, REAL_POR_PONTO, Currency, LEVEL_BENEFITS } from "@/constants/levels";
+import { Download, ChevronDown, ChevronUp } from "lucide-react";
+import { LEVELS, Currency, LEVEL_BENEFITS } from "@/constants/levels";
 import { formatCurrency, formatNumber, getNivelAtual } from "@/utils/calculations";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import * as XLSX from 'xlsx';
 
@@ -27,237 +14,133 @@ interface LevelsTableProps {
 
 export const LevelsTable = ({ pontosUsuario, currency }: LevelsTableProps) => {
   const nivelUsuario = pontosUsuario ? getNivelAtual(pontosUsuario) : null;
+  const [showAll, setShowAll] = useState(false);
+
+  // Show relevant levels: nearby user level or first 10
+  const visibleLevels = showAll
+    ? LEVELS
+    : nivelUsuario
+      ? LEVELS.filter(l => Math.abs(l.nivel - nivelUsuario) <= 5)
+      : LEVELS.slice(0, 10);
 
   const exportToExcel = () => {
     const costPerPoint = currency.costPerPoint;
     const data = LEVELS.map((level) => {
-      const custoInicial = level.inicio * costPerPoint;
-      const custoFinal = level.fim * costPerPoint;
       const pontosNecessarios = level.fim - level.inicio + 1;
       const custoNivel = pontosNecessarios * costPerPoint;
       const benefits = LEVEL_BENEFITS[level.nivel];
-      
-      let statusUsuario = "";
-      let pontosFaltantes = 0;
-      let reaisFaltantes = 0;
-      let pontosJaTem = 0;
-      let reaisJaGastou = 0;
-      
-      if (pontosUsuario) {
-        if (nivelUsuario && level.nivel === nivelUsuario) {
-          statusUsuario = "✓ SEU NÍVEL ATUAL";
-          pontosJaTem = pontosUsuario - level.inicio;
-          reaisJaGastou = pontosJaTem * costPerPoint;
-          pontosFaltantes = level.fim - pontosUsuario;
-          reaisFaltantes = pontosFaltantes * costPerPoint;
-        } else if (level.nivel < (nivelUsuario || 0)) {
-          statusUsuario = "Completo";
-          pontosJaTem = level.fim - level.inicio + 1;
-          reaisJaGastou = pontosJaTem * costPerPoint;
-        } else if (level.nivel > (nivelUsuario || 0)) {
-          statusUsuario = "Bloqueado";
-          pontosFaltantes = level.inicio - (pontosUsuario || 0);
-          reaisFaltantes = pontosFaltantes * costPerPoint;
-        }
-      }
-      
       return {
         "Nível": level.nivel,
         "Distintivo": benefits?.badge || "-",
-        "Benefícios": benefits?.benefits.join(", ") || "-",
         "Pontos Inicial": level.inicio,
-        "Pontos Final": level.fim,
-        "Total de Pontos do Nível": pontosNecessarios,
-        [`Custo Inicial (${currency.symbol})`]: custoInicial.toFixed(2),
-        [`Custo Final (${currency.symbol})`]: custoFinal.toFixed(2),
-        [`Custo do Nível (${currency.symbol})`]: custoNivel.toFixed(2),
-        ...(pontosUsuario ? {
-          "Status": statusUsuario,
-          "Pontos que Você Tem": pontosJaTem,
-          [`${currency.symbol} Já Gastos`]: reaisJaGastou.toFixed(2),
-          "Pontos Faltantes": pontosFaltantes,
-          [`${currency.symbol} Faltantes`]: reaisFaltantes.toFixed(2),
-        } : {}),
+        "Pontos Final": level.fim === Infinity ? "∞" : level.fim,
+        "Pontos do Nível": level.fim === Infinity ? "∞" : pontosNecessarios,
+        [`Custo (${currency.symbol})`]: level.fim === Infinity ? "∞" : custoNivel.toFixed(2),
       };
     });
-
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Níveis TikTok");
-    
-    const maxWidth = data.reduce((w, r) => Math.max(w, ...Object.keys(r).map(k => k.length)), 10);
-    ws['!cols'] = Object.keys(data[0]).map(() => ({ wch: maxWidth }));
-    
-    XLSX.writeFile(wb, `TikTok_Gifter_Niveis_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Níveis");
+    XLSX.writeFile(wb, `GiftsTok_Niveis_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.3 }}
-      className="card-glass rounded-2xl p-6"
-    >
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <h3 className="text-2xl font-bold">
-          <span className="gradient-text">Tabela Completa de Níveis</span>
-        </h3>
-        
-        <Button
-          onClick={exportToExcel}
-          variant="outline"
-          size="sm"
-          className="bg-neon-cyan/10 border-neon-cyan/30 hover:bg-neon-cyan/20 text-neon-cyan"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Baixar Planilha
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-bold gradient-text">Tabela de Níveis</h3>
+        <Button onClick={exportToExcel} variant="ghost" size="sm" className="text-xs text-primary h-8 px-2">
+          <Download className="w-3.5 h-3.5 mr-1" />
+          Excel
         </Button>
       </div>
-      
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="text-neon-cyan font-bold text-xs">Nível</TableHead>
-              <TableHead className="text-neon-cyan font-bold text-xs">Distintivo</TableHead>
-              <TableHead className="text-neon-cyan font-bold text-xs">Pontos<br/>Inicial</TableHead>
-              <TableHead className="text-neon-cyan font-bold text-xs">Pontos<br/>Final</TableHead>
-              <TableHead className="text-neon-cyan font-bold text-xs">Pontos do<br/>Nível</TableHead>
-              <TableHead className="text-neon-cyan font-bold text-xs">Custo do<br/>Nível</TableHead>
-              {pontosUsuario && (
-                <>
-                  <TableHead className="text-neon-pink font-bold text-xs">Pontos que<br/>Você Tem</TableHead>
-                  <TableHead className="text-neon-pink font-bold text-xs">{currency.symbol} Já<br/>Gastos</TableHead>
-                  <TableHead className="text-neon-purple font-bold text-xs">Pontos<br/>Faltantes</TableHead>
-                  <TableHead className="text-neon-purple font-bold text-xs">{currency.symbol}<br/>Faltantes</TableHead>
-                </>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {LEVELS.map((level) => {
-              const pontosNecessarios = level.fim - level.inicio + 1;
-              const costPerPoint = currency.costPerPoint;
-              const custoNivel = pontosNecessarios * costPerPoint;
-              const isAtual = nivelUsuario === level.nivel;
-              const isCompleto = nivelUsuario && level.nivel < nivelUsuario;
-              const isBloqueado = nivelUsuario && level.nivel > nivelUsuario;
-              const benefits = LEVEL_BENEFITS[level.nivel];
-              
-              let pontosFaltantes = 0;
-              let reaisFaltantes = 0;
-              let pontosJaTem = 0;
-              let reaisJaGastou = 0;
-              
-              if (pontosUsuario) {
-                if (isAtual) {
-                  pontosJaTem = pontosUsuario - level.inicio;
-                  reaisJaGastou = pontosJaTem * costPerPoint;
-                  pontosFaltantes = level.fim - pontosUsuario;
-                  reaisFaltantes = pontosFaltantes * costPerPoint;
-                } else if (isCompleto) {
-                  pontosJaTem = pontosNecessarios;
-                  reaisJaGastou = custoNivel;
-                } else if (isBloqueado) {
-                  pontosFaltantes = level.inicio - pontosUsuario;
-                  reaisFaltantes = pontosFaltantes * costPerPoint;
-                }
-              }
-              
-              return (
-                <TableRow
-                  key={level.nivel}
-                  className={`border-border transition-colors text-xs ${
-                    isAtual
-                      ? "bg-neon-cyan/20 hover:bg-neon-cyan/30 border-l-4 border-l-neon-cyan"
-                      : isCompleto
-                      ? "bg-green-500/5 hover:bg-green-500/10"
-                      : "hover:bg-muted/5"
-                  }`}
-                >
-                  <TableCell className="font-bold">
-                    <span className={isAtual ? "text-neon-cyan text-base" : ""}>
-                      {level.nivel}
-                      {isAtual && <span className="ml-2 text-[10px]">← VOCÊ</span>}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {benefits && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center gap-1">
-                              <Badge 
-                                className={`${benefits.badgeColor} text-white text-[10px] px-2 py-0.5 cursor-help`}
-                              >
-                                {benefits.badge}
-                              </Badge>
-                              <Info className="w-3 h-3 text-muted-foreground" />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p className="font-bold mb-1">Benefícios do Nível {level.nivel}:</p>
-                            <ul className="list-disc list-inside text-xs">
-                              {benefits.benefits.map((benefit, i) => (
-                                <li key={i}>{benefit}</li>
-                              ))}
-                            </ul>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatNumber(level.inicio)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatNumber(level.fim)}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {formatNumber(pontosNecessarios)}
-                  </TableCell>
-                  <TableCell className="text-neon-pink font-medium">
-                    {formatCurrency(custoNivel, currency)}
-                  </TableCell>
-                  {pontosUsuario && (
-                    <>
-                      <TableCell className={isAtual || isCompleto ? "text-neon-cyan font-medium" : "text-muted-foreground"}>
-                        {pontosJaTem > 0 ? formatNumber(pontosJaTem) : "-"}
-                      </TableCell>
-                      <TableCell className={isAtual || isCompleto ? "text-neon-cyan font-medium" : "text-muted-foreground"}>
-                        {reaisJaGastou > 0 ? formatCurrency(reaisJaGastou, currency) : "-"}
-                      </TableCell>
-                      <TableCell className={isAtual || isBloqueado ? "text-neon-purple font-medium" : "text-muted-foreground"}>
-                        {pontosFaltantes > 0 ? formatNumber(pontosFaltantes) : "-"}
-                      </TableCell>
-                      <TableCell className={isAtual || isBloqueado ? "text-neon-purple font-medium" : "text-muted-foreground"}>
-                        {reaisFaltantes > 0 ? formatCurrency(reaisFaltantes, currency) : "-"}
-                      </TableCell>
-                    </>
+
+      {/* Mobile card list */}
+      <div className="space-y-2">
+        {visibleLevels.map((level) => {
+          const pontosNecessarios = level.fim - level.inicio + 1;
+          const custoNivel = pontosNecessarios * currency.costPerPoint;
+          const isAtual = nivelUsuario === level.nivel;
+          const isCompleto = nivelUsuario !== null && level.nivel < nivelUsuario;
+          const benefits = LEVEL_BENEFITS[level.nivel];
+
+          let pontosUser = 0;
+          let pontosFaltantes = 0;
+
+          if (pontosUsuario && isAtual) {
+            pontosUser = pontosUsuario - level.inicio;
+            pontosFaltantes = level.fim - pontosUsuario;
+          } else if (pontosUsuario && !isCompleto && nivelUsuario !== null && level.nivel > nivelUsuario) {
+            pontosFaltantes = level.inicio - pontosUsuario;
+          }
+
+          return (
+            <motion.div
+              key={level.nivel}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className={`card-glass rounded-lg p-3 ${
+                isAtual ? "border border-primary/40 bg-primary/5" :
+                isCompleto ? "opacity-60" : ""
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <span className={`text-base font-bold ${isAtual ? "text-primary" : "text-foreground"}`}>
+                    Nv.{level.nivel}
+                  </span>
+                  {isAtual && (
+                    <Badge variant="outline" className="text-[9px] border-primary/50 text-primary h-4 px-1.5">
+                      VOCÊ
+                    </Badge>
                   )}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                  {benefits && (
+                    <Badge className={`${benefits.badgeColor} text-white text-[9px] h-4 px-1.5`}>
+                      {benefits.badge}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-xs text-secondary font-medium">
+                  {level.fim === Infinity ? "∞" : formatCurrency(custoNivel, currency)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{formatNumber(level.inicio)} — {level.fim === Infinity ? "∞" : formatNumber(level.fim)} pts</span>
+                {isAtual && pontosUsuario && (
+                  <span className="text-primary font-medium">
+                    Faltam {formatNumber(pontosFaltantes)} pts
+                  </span>
+                )}
+                {!isAtual && !isCompleto && pontosUsuario && pontosFaltantes > 0 && (
+                  <span className="text-accent text-[10px]">
+                    +{formatNumber(pontosFaltantes)} pts
+                  </span>
+                )}
+                {isCompleto && <span className="text-green-500 text-[10px]">✓</span>}
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
-      
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setShowAll(!showAll)}
+        className="w-full text-xs text-muted-foreground h-9 touch-target"
+      >
+        {showAll ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+        {showAll ? "Mostrar menos" : `Ver todos os ${LEVELS.length} níveis`}
+      </Button>
+
+      {/* Legend */}
       {pontosUsuario && (
-        <div className="mt-4 flex flex-wrap gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-neon-cyan/20 border-l-4 border-l-neon-cyan"></div>
-            <span className="text-muted-foreground">Seu nível atual</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500/5"></div>
-            <span className="text-muted-foreground">Níveis completos</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-muted/5"></div>
-            <span className="text-muted-foreground">Níveis bloqueados</span>
-          </div>
+        <div className="flex gap-3 text-[10px] text-muted-foreground justify-center">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary"></span>Atual</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span>Completo</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted"></span>Bloqueado</span>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 };
