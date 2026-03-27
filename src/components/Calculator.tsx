@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, AlertCircle, Gift, ExternalLink } from "lucide-react";
+import confetti from "canvas-confetti";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatsCards } from "./StatsCards";
@@ -95,6 +96,17 @@ export const Calculator = ({ activeTab }: CalculatorProps) => {
     return { ...selectedCurrency, costPerPoint: price / 1000 };
   }, [pricePer1000, selectedCurrency]);
 
+  const fireConfetti = useCallback(() => {
+    const colors = ["#00ffff", "#ff00aa", "#aa00ff"];
+    const end = Date.now() + 2500;
+    const frame = () => {
+      confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors });
+      confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    };
+    frame();
+  }, []);
+
   const handleCalculate = async () => {
     if (!priceAvailable) {
       toast.error("Aguarde o administrador definir o preço do dia.");
@@ -103,6 +115,14 @@ export const Calculator = ({ activeTab }: CalculatorProps) => {
     const pontosNum = parseInt(pontos.replace(/\D/g, ""));
     if (!isNaN(pontosNum) && pontosNum > 0) {
       setPontosCalculados(pontosNum);
+
+      // First-time confetti
+      const isFirst = !localStorage.getItem("giftstok_first_calc");
+      if (isFirst) {
+        localStorage.setItem("giftstok_first_calc", "1");
+        fireConfetti();
+      }
+
       try {
         const deviceId = getDeviceId();
         const currentLevel = getNivelAtual(pontosNum);
